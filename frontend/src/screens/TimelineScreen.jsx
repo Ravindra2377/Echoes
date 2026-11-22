@@ -307,17 +307,17 @@ export default function TimelineScreen({ selectedDay: initialDay }) {
                   <div
                     key={d.day}
                     onClick={() => setSelectedDay(d.day)}
-                    className={`p-2.5 sm:p-3 rounded-2xl cursor-pointer transition border min-w-[135px] sm:min-w-[155px] md:min-w-0 md:w-full shrink-0 md:shrink ${
+                    className={`p-2.5 sm:p-3 rounded-2xl cursor-pointer transition-all duration-200 border min-w-[135px] sm:min-w-[155px] md:min-w-0 md:w-full shrink-0 md:shrink ${
                       isSelected
-                        ? "bg-[var(--aubergine-soft)] border-[var(--primary)] shadow-sm"
-                        : "bg-[var(--card)] border-[var(--border)] hover:border-[var(--primary)]/50"
+                        ? "bg-[var(--aubergine-soft)] border-[var(--primary)] shadow-sm scale-[1.01]"
+                        : "bg-[var(--card)] border-[var(--border)] hover:border-[var(--primary)]/50 hover:-translate-y-0.5"
                     }`}
                   >
                     <div className="flex items-center justify-between mb-1 gap-1">
                       <div className="flex flex-col min-w-0">
                         <span
                           className={`font-fraunces text-xs sm:text-sm font-bold truncate ${
-                            isSelected ? "text-[var(--primary)]" : "text-[var(--ink)]"
+                            isSelected ? "text-[var(--primary)] font-extrabold" : "text-[var(--ink)]"
                           }`}
                         >
                           {formatDayLabel(d.day)}
@@ -530,9 +530,10 @@ export default function TimelineScreen({ selectedDay: initialDay }) {
                         return (
                           <div
                             key={track.id || idx}
-                            className={`p-2.5 sm:p-3.5 flex items-center justify-between gap-2 sm:gap-3 transition ${
+                            style={{ animationDelay: `${Math.min(idx * 30, 360)}ms` }}
+                            className={`stagger-item p-2.5 sm:p-3.5 flex items-center justify-between gap-2 sm:gap-3 transition duration-200 ${
                               isCurrentlyPlaying
-                                ? "bg-[var(--aubergine-soft)]/50"
+                                ? "bg-[var(--aubergine-soft)]/60 shadow-sm"
                                 : "hover:bg-[var(--paper)]"
                             }`}
                           >
@@ -541,9 +542,9 @@ export default function TimelineScreen({ selectedDay: initialDay }) {
                               <button
                                 type="button"
                                 onClick={() => handlePlayTrack(track)}
-                                className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center shrink-0 transition ${
+                                className={`group/btn w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center shrink-0 transition-all duration-200 ${
                                   isCurrentlyPlaying
-                                    ? "bg-[var(--primary)] text-white shadow-md animate-pulse"
+                                    ? "bg-[var(--primary)] text-white shadow-md ring-2 ring-[var(--primary)]/30"
                                     : "bg-[var(--card-alt)] text-[var(--ink)] hover:bg-[var(--primary)] hover:text-white"
                                 }`}
                                 title={
@@ -555,7 +556,14 @@ export default function TimelineScreen({ selectedDay: initialDay }) {
                                 {isLoadingAudio ? (
                                   <Disc className="w-3.5 h-3.5 sm:w-4 sm:h-4 animate-spin text-[var(--primary)]" />
                                 ) : isCurrentlyPlaying ? (
-                                  <Pause className="w-3 h-3 sm:w-3.5 sm:h-3.5 fill-current" />
+                                  <>
+                                    <div className="eq-container text-white group-hover/btn:hidden">
+                                      <span className="eq-bar eq-bar-1" />
+                                      <span className="eq-bar eq-bar-2" />
+                                      <span className="eq-bar eq-bar-3" />
+                                    </div>
+                                    <Pause className="w-3 h-3 sm:w-3.5 sm:h-3.5 fill-current hidden group-hover/btn:block text-white" />
+                                  </>
                                 ) : (
                                   <Play className="w-3 h-3 sm:w-3.5 sm:h-3.5 fill-current ml-0.5" />
                                 )}

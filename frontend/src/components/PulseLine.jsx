@@ -154,6 +154,7 @@ export default function PulseLine({ onSelectDay, selectedDay, refreshTrigger }) 
                   strokeWidth="2.5"
                   strokeLinecap="round"
                   strokeLinejoin="round"
+                  className="animate-draw-path"
                 />
               )}
 
@@ -167,9 +168,23 @@ export default function PulseLine({ onSelectDay, selectedDay, refreshTrigger }) 
                     onClick={() => onSelectDay?.(pt.day)}
                     onMouseEnter={() => setHoveredPoint(pt)}
                     onMouseLeave={() => setHoveredPoint(null)}
-                    className="cursor-pointer"
+                    className="cursor-pointer group/node"
                   >
-                    <circle cx={pt.x} cy={pt.y} r="10" fill="transparent" />
+                    <circle cx={pt.x} cy={pt.y} r="12" fill="transparent" />
+
+                    {/* Radar ping ripple on selected node */}
+                    {isSelected && (
+                      <circle
+                        cx={pt.x}
+                        cy={pt.y}
+                        r="5"
+                        fill="none"
+                        stroke="var(--primary)"
+                        strokeWidth="1.5"
+                        className="animate-radar-ring pointer-events-none"
+                      />
+                    )}
+
                     {(hasListens || isSelected) && (
                       <circle
                         cx={pt.x}
@@ -178,6 +193,7 @@ export default function PulseLine({ onSelectDay, selectedDay, refreshTrigger }) 
                         fill={isSelected ? "#FFFFFF" : "var(--primary)"}
                         stroke="var(--primary)"
                         strokeWidth={isSelected ? "2.5" : "1"}
+                        className="transition-transform duration-200 group-hover/node:scale-125"
                       />
                     )}
                   </g>

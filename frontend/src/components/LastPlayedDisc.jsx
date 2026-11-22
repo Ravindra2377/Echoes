@@ -322,6 +322,9 @@ export default function LastPlayedDisc({
           onClick={handleTogglePlay}
           title={isPlaying ? "Click to stop" : "Click to play"}
         >
+          {/* Ambient Turntable Soundwave Halo */}
+          <div className="lpd-ambient-halo" />
+
           {/* Background Cascading Records (only when there are upcoming tracks) */}
           {stackedTracks.map((trk, i) => {
             const trkSrc = SOURCES[trk.source] || { color: "#8b5cf6" };
@@ -346,6 +349,9 @@ export default function LastPlayedDisc({
 
           {/* Active Centered Spinning Record */}
           <div className="lpd-disc lpd-disc-active">
+            {/* Realistic Vinyl Conic Grooves Sheen */}
+            <div className="lpd-disc-sheen" />
+
             {/* Repeat badge on top-right of active vinyl */}
             {isRepeating && (
               <div className="lpd-repeat-badge" title="Repeating this song">
@@ -387,6 +393,7 @@ export default function LastPlayedDisc({
               <circle cx="236" cy="24" r="4.5" fill="#111827" />
 
               <g
+                className={isPlaying ? "lpd-needle-flutter" : ""}
                 style={{
                   transformOrigin: "236px 24px",
                   transform: isPlaying ? "rotate(0deg)" : "rotate(-45deg)",

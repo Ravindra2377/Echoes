@@ -18,9 +18,9 @@ export default function CustomTabBar({ activeTab, onSelectTab }) {
       style={{ paddingBottom: "max(4px, env(safe-area-inset-bottom, 4px))" }}
     >
       <div className="relative pointer-events-auto flex items-center p-1 sm:p-1.5 rounded-full liquid-glass border border-[var(--glass-border)] shadow-2xl backdrop-blur-2xl w-full max-w-[370px] sm:max-w-md">
-        {/* Active sliding lens */}
+        {/* Active sliding lens with spring physics */}
         <div
-          className="absolute top-1 bottom-1 sm:top-1.5 sm:bottom-1.5 rounded-full bg-[var(--primary)] shadow-md transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] pointer-events-none"
+          className="absolute top-1 bottom-1 sm:top-1.5 sm:bottom-1.5 rounded-full bg-[var(--primary)] shadow-md transition-all duration-400 ease-[cubic-bezier(0.34,1.45,0.64,1)] pointer-events-none"
           style={{
             width: `calc((100% - 8px) / ${TABS.length})`,
             left: `calc(4px + ${activeIndex} * (100% - 8px) / ${TABS.length})`,
@@ -37,15 +37,15 @@ export default function CustomTabBar({ activeTab, onSelectTab }) {
               key={tab.id}
               onClick={() => onSelectTab(tab.id)}
               type="button"
-              className={`relative z-10 flex flex-col items-center justify-center flex-1 min-w-0 py-1.5 sm:py-2 border-0 bg-transparent outline-none cursor-pointer rounded-full transition-all duration-200 ${
+              className={`relative z-10 flex flex-col items-center justify-center flex-1 min-w-0 py-1.5 sm:py-2 border-0 bg-transparent outline-none cursor-pointer rounded-full transition-all duration-200 active:scale-90 ${
                 isActive
                   ? "text-white font-semibold"
                   : "text-[var(--ink-soft)] hover:text-[var(--ink)] font-normal"
               }`}
             >
               <Icon
-                className={`w-4 h-4 sm:w-5 sm:h-5 transition-transform duration-200 ${
-                  isActive ? "scale-110" : ""
+                className={`w-4 h-4 sm:w-5 sm:h-5 transition-transform duration-300 ease-[cubic-bezier(0.34,1.4,0.64,1)] ${
+                  isActive ? "scale-115 -translate-y-0.5" : "hover:scale-105"
                 }`}
               />
               <span className="text-[9px] sm:text-[10px] tracking-tight mt-0.5 truncate max-w-full px-0.5">

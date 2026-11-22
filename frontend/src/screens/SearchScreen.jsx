@@ -191,10 +191,11 @@ export default function SearchScreen({ initialQuery = "" }) {
             </SurfaceCard>
           ) : (
             <div className="grid gap-2">
-              {filteredResults.map((item) => (
+              {filteredResults.map((item, idx) => (
                 <SurfaceCard
                   key={item.id}
-                  className="p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:border-[var(--primary)]/40 transition group"
+                  style={{ animationDelay: `${Math.min(idx * 25, 300)}ms` }}
+                  className="stagger-item p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:border-[var(--primary)] hover:-translate-y-0.5 hover:shadow-md transition-all duration-200 group"
                 >
                   <div className="flex items-start gap-3 min-w-0">
                     <div className="w-10 h-10 rounded-lg bg-[var(--card-alt)] flex items-center justify-center text-[var(--primary)] shrink-0">

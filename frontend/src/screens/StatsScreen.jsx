@@ -54,7 +54,7 @@ export default function StatsScreen() {
         <div className="space-y-4 sm:space-y-5">
           {/* Top Metric Cards */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
-            <SurfaceCard className="p-3 sm:p-4">
+            <SurfaceCard className="p-3 sm:p-4 hover:-translate-y-0.5 hover:shadow-md transition-all duration-300">
               <span className="text-[11px] sm:text-xs text-[var(--ink-soft)] block mb-1">
                 Total Plays
               </span>
@@ -63,7 +63,7 @@ export default function StatsScreen() {
               </span>
             </SurfaceCard>
 
-            <SurfaceCard className="p-3 sm:p-4">
+            <SurfaceCard className="p-3 sm:p-4 hover:-translate-y-0.5 hover:shadow-md transition-all duration-300">
               <span className="text-[11px] sm:text-xs text-[var(--ink-soft)] block mb-1">
                 Artists
               </span>
@@ -72,7 +72,7 @@ export default function StatsScreen() {
               </span>
             </SurfaceCard>
 
-            <SurfaceCard className="p-3 sm:p-4">
+            <SurfaceCard className="p-3 sm:p-4 hover:-translate-y-0.5 hover:shadow-md transition-all duration-300">
               <span className="text-[11px] sm:text-xs text-[var(--ink-soft)] block mb-1">
                 Days Logged
               </span>
@@ -81,7 +81,7 @@ export default function StatsScreen() {
               </span>
             </SurfaceCard>
 
-            <SurfaceCard className="p-3 sm:p-4">
+            <SurfaceCard className="p-3 sm:p-4 hover:-translate-y-0.5 hover:shadow-md transition-all duration-300">
               <span className="text-[11px] sm:text-xs text-[var(--ink-soft)] block mb-1">
                 Mood Tags
               </span>
@@ -165,7 +165,7 @@ export default function StatsScreen() {
                       </div>
                       <div className="w-full h-1.5 rounded-full bg-[var(--card-alt)] overflow-hidden">
                         <div
-                          className="h-full rounded-full bg-[var(--primary)]"
+                          className="h-full rounded-full bg-[var(--primary)] transition-all duration-700 ease-out"
                           style={{ width: `${(a.plays / maxArtistPlays) * 100}%` }}
                         />
                       </div>
@@ -199,7 +199,7 @@ export default function StatsScreen() {
                       </div>
                       <div className="w-full h-1.5 rounded-full bg-[var(--card-alt)] overflow-hidden">
                         <div
-                          className="h-full rounded-full bg-[#116149]"
+                          className="h-full rounded-full bg-[#116149] transition-all duration-700 ease-out"
                           style={{ width: `${(t.plays / maxTrackPlays) * 100}%` }}
                         />
                       </div>

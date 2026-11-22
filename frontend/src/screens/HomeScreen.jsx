@@ -79,8 +79,11 @@ export default function HomeScreen({ onNavigateSearch, onNavigateTimeline, onNav
           {getGreeting()}, {firstName}
         </h1>
 
-        <div className="flex items-center gap-1.5 px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-full bg-[var(--aubergine-soft)] text-[var(--primary)] text-[11px] sm:text-xs font-semibold self-start sm:self-auto">
-          <span className="w-2 h-2 rounded-full bg-[var(--primary)] animate-pulse" />
+        <div className="flex items-center gap-2 px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-full bg-[var(--aubergine-soft)] text-[var(--primary)] text-[11px] sm:text-xs font-semibold self-start sm:self-auto shadow-sm">
+          <span className="relative flex h-2 w-2">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[var(--primary)] opacity-75" />
+            <span className="relative inline-flex rounded-full h-2 w-2 bg-[var(--primary)]" />
+          </span>
           <span>Tracking Active</span>
         </div>
       </div>
@@ -200,7 +203,7 @@ export default function HomeScreen({ onNavigateSearch, onNavigateTimeline, onNav
               <SurfaceCard
                 key={d.day}
                 onClick={() => onNavigateTimeline(d.day)}
-                className="p-4 cursor-pointer hover:border-[var(--primary)] transition group"
+                className="p-4 cursor-pointer hover:border-[var(--primary)] hover:-translate-y-1 hover:shadow-md transition-all duration-300 group"
               >
                 <div className="flex items-center justify-between mb-1.5">
                   <span className="font-fraunces text-sm font-bold text-[var(--ink)] group-hover:text-[var(--primary)] transition">
