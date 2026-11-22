@@ -1,0 +1,325 @@
+.lpd{
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  gap:clamp(12px, 3vw, 16px);
+  padding:clamp(16px, 4vw, 24px) 8px clamp(60px, 10vw, 84px);
+  color:var(--ink,#1b2233);
+  max-width:440px;
+  width:100%;
+  margin:0 auto;
+  box-sizing:border-box;
+}
+
+/* Vinyl Presentation Container - Always Centered */
+.lpd-visual{
+  position:relative;
+  width:100%;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  user-select:none;
+}
+
+/* Turntable Stage (Active Record + Tonearm) - Always Centered & Fluid */
+.lpd-stage{
+  position:relative;
+  width:clamp(170px, 48vw, 230px);
+  aspect-ratio:1;
+  margin:0 auto;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  cursor:pointer;
+  box-sizing:border-box;
+}
+
+/* Base Vinyl Disc */
+.lpd-disc{
+  border-radius:50%;
+  display:grid;
+  place-items:center;
+  background:
+    conic-gradient(from 20deg,rgba(255,255,255,.14),transparent 18%,rgba(255,255,255,.08) 40%,transparent 58%,rgba(255,255,255,.14) 80%,transparent),
+    repeating-radial-gradient(circle,#13161c 0 2px,#21252e 2px 3.5px);
+  box-shadow:
+    0 16px 36px rgba(15,23,42,.32),
+    inset 0 0 0 3px #0b0d12;
+  position:relative;
+}
+
+/* Active Spinning Record - Dead Centered */
+.lpd-disc-active{
+  width:100%;
+  height:100%;
+  z-index:10;
+  animation:lpd-spin 6s linear infinite;
+  animation-play-state:paused;
+}
+.lpd-is-playing .lpd-disc-active{
+  animation-play-state:running;
+}
+
+/* Cascading Stacked Records with responsive percentage offsets */
+.lpd-disc-stacked{
+  position:absolute;
+  top:50%;
+  transform:translateY(-50%);
+  transition:all 0.4s ease;
+  pointer-events:none;
+}
+.lpd-disc-stacked-1{
+  width:86%;
+  height:86%;
+  right:-16%;
+  z-index:8;
+  opacity:0.95;
+}
+.lpd-disc-stacked-2{
+  width:72%;
+  height:72%;
+  right:-28%;
+  z-index:6;
+  opacity:0.88;
+}
+.lpd-disc-stacked-3{
+  width:58%;
+  height:58%;
+  right:-38%;
+  z-index:4;
+  opacity:0.80;
+}
+
+@media (max-width: 380px) {
+  .lpd-disc-stacked-3 {
+    display: none;
+  }
+  .lpd-disc-stacked-2 {
+    right: -22%;
+  }
+  .lpd-disc-stacked-1 {
+    right: -12%;
+  }
+}
+
+/* Center Album Label */
+.lpd-label{
+  width:38%;
+  aspect-ratio:1;
+  border-radius:50%;
+  display:grid;
+  place-items:center;
+  position:relative;
+  box-shadow:0 0 0 3px rgba(0,0,0,.45);
+  color:#fff;
+  background-size:cover;
+  background-position:center;
+  overflow:hidden;
+}
+.lpd-label span{
+  font:700 clamp(18px, 5.5vw, 32px)/1 Fraunces,Georgia,serif;
+  text-shadow:0 2px 4px rgba(0,0,0,0.5);
+}
+.lpd-hole{
+  position:absolute;
+  width:9%;
+  aspect-ratio:1;
+  border-radius:50%;
+  background:var(--paper, #f7f8f7);
+  box-shadow:inset 0 0 0 1.5px rgba(0,0,0,.45);
+}
+
+/* Precision Tonearm on Active Disc - Fluid SVG Overlay */
+.lpd-arm{
+  position:absolute;
+  inset:0;
+  width:100%;
+  height:100%;
+  z-index:15;
+  pointer-events:none;
+  filter:drop-shadow(0 6px 12px rgba(0,0,0,.45));
+}
+.lpd-arm svg{
+  width:100%;
+  height:100%;
+  overflow:visible;
+}
+
+/* Repeat Indicator Badge on Vinyl */
+.lpd-repeat-badge{
+  position:absolute;
+  top:4px;
+  right:4px;
+  width:24px;
+  height:24px;
+  border-radius:50%;
+  background:var(--primary, #16845B);
+  color:#ffffff;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  z-index:20;
+  box-shadow:0 2px 6px rgba(0,0,0,0.25);
+  animation:lpd-fade-in 0.25s ease-out;
+}
+
+/* Up Next / Playlist Pill Badge */
+.lpd-pill{
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  padding:5px 14px;
+  border-radius:9999px;
+  background:var(--card, #ffffff);
+  border:1px solid var(--border, rgba(0,0,0,0.08));
+  box-shadow:0 2px 8px rgba(0,0,0,0.04);
+  font-size:clamp(11px, 2.8vw, 12px);
+  color:var(--ink, #1b2233);
+  max-width:min(320px, 90vw);
+  cursor:pointer;
+  transition:all 0.15s ease;
+}
+.lpd-pill:hover{
+  border-color:var(--primary, #16845B);
+  transform:translateY(-1px);
+}
+.lpd-pill-dot{
+  width:8px;
+  height:8px;
+  border-radius:50%;
+  flex-shrink:0;
+}
+
+/* Track Metadata with Fluid Fonts */
+.lpd-info{
+  text-align:center;
+  width:100%;
+  max-width:340px;
+  padding:0 8px;
+  box-sizing:border-box;
+}
+.lpd-kicker{
+  font-size:clamp(11px, 2.8vw, 13px);
+  color:var(--ink-soft,#6b7488);
+  margin-bottom:2px;
+  font-weight:500;
+}
+.lpd-title{
+  font:700 clamp(18px, 4.5vw, 24px)/1.2 Fraunces,Georgia,serif;
+  color:var(--ink,#1b2233);
+  word-break:break-word;
+}
+.lpd-artist{
+  font-size:clamp(13px, 3.2vw, 15px);
+  color:var(--ink-soft,#4b5563);
+  margin-top:2px;
+  font-weight:500;
+}
+.lpd-subtitle{
+  font-size:clamp(11px, 2.6vw, 12px);
+  color:var(--ink-faint,#94a3b8);
+  margin-top:4px;
+}
+
+/* Audio Progress Bar */
+.lpd-progress-track{
+  width:100%;
+  max-width:min(320px, 85vw);
+  height:3.5px;
+  border-radius:9999px;
+  background:var(--card-alt, rgba(0,0,0,0.08));
+  overflow:hidden;
+  cursor:pointer;
+  position:relative;
+  transition:height 0.15s ease;
+}
+.lpd-progress-track:hover{
+  height:5px;
+}
+.lpd-progress-fill{
+  height:100%;
+  background:var(--primary, #16845B);
+  border-radius:9999px;
+  transition:width 0.1s linear;
+}
+
+/* Transport Controls Row */
+.lpd-controls{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:clamp(8px, 2.5vw, 14px);
+  padding-top:4px;
+}
+
+.lpd-btn{
+  width:clamp(36px, 9vw, 42px);
+  height:clamp(36px, 9vw, 42px);
+  border-radius:50%;
+  background:var(--card, #ffffff);
+  border:1px solid var(--border, rgba(0,0,0,0.08));
+  color:var(--ink, #1b2233);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  box-shadow:0 2px 6px rgba(0,0,0,0.04);
+  cursor:pointer;
+  transition:all 0.15s ease;
+  position:relative;
+}
+.lpd-btn:hover:not(:disabled){
+  transform:scale(1.06);
+  border-color:var(--primary, #16845B);
+  color:var(--primary, #16845B);
+}
+.lpd-btn:active:not(:disabled){
+  transform:scale(0.95);
+}
+.lpd-btn:disabled{
+  opacity:0.35;
+  cursor:not-allowed;
+}
+
+.lpd-btn-play{
+  width:clamp(44px, 11vw, 50px);
+  height:clamp(44px, 11vw, 50px);
+  background:var(--primary, #16845B);
+  color:#ffffff;
+  border:none;
+  box-shadow:0 4px 14px rgba(22,132,91,0.35);
+}
+.lpd-btn-play:hover{
+  background:var(--aubergine-deep, #0D4F3C);
+  color:#ffffff;
+  transform:scale(1.06);
+}
+
+.lpd-btn-repeat.is-active{
+  color:var(--primary, #16845B);
+  border-color:rgba(22,132,91,0.35);
+}
+.lpd-btn-repeat-dot{
+  position:absolute;
+  bottom:6px;
+  width:3.5px;
+  height:3.5px;
+  border-radius:50%;
+  background:var(--primary, #16845B);
+}
+
+/* High-DPI screens adjustments */
+@media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 192dpi) {
+  .lpd-disc {
+    box-shadow: 0 16px 36px rgba(15,23,42,.36), inset 0 0 0 2px #0b0d12;
+  }
+}
+
+@keyframes lpd-spin{
+  from{transform:rotate(0deg)}
+  to{transform:rotate(360deg)}
+}
+
+@keyframes lpd-fade-in{
+  from{opacity:0;transform:scale(0.8)}
+  to{opacity:1;transform:scale(1)}
+}
