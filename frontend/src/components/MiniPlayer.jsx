@@ -13,7 +13,7 @@ export default function MiniPlayer({ onExpandHome }) {
       className="fixed bottom-[68px] sm:bottom-[82px] left-0 right-0 z-40 flex justify-center px-2 sm:px-4 pointer-events-none animate-fade-in"
       style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
     >
-      <div className="pointer-events-auto flex flex-col w-full max-w-[370px] sm:max-w-md rounded-2xl liquid-glass border border-[var(--glass-border)] shadow-xl overflow-hidden backdrop-blur-2xl">
+      <div className="pointer-events-auto flex flex-col w-full max-w-[370px] sm:max-w-md rounded-2xl liquid-glass lg-float border overflow-hidden">
         {/* Slim top progress track */}
         <div className="w-full h-[2.5px] bg-black/5 dark:bg-white/10">
           <div
@@ -78,7 +78,7 @@ export default function MiniPlayer({ onExpandHome }) {
             <button
               type="button"
               onClick={togglePlay}
-              className="w-8 h-8 rounded-full bg-[var(--primary)] text-white flex items-center justify-center shadow-md hover:scale-105 active:scale-95 transition"
+              className="w-8 h-8 rounded-full lg-btn text-white flex items-center justify-center hover:scale-105 active:scale-95 transition"
               title={isPlaying ? "Pause" : "Play"}
             >
               {isPlaying ? (
