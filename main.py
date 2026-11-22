@@ -74,6 +74,73 @@ def search(q: str, limit: int = 50):
     return rows("SELECT * FROM listens WHERE track LIKE ? OR artist LIKE ? OR album LIKE ? "
                 "ORDER BY played_at DESC LIMIT ?", (like, like, like, limit))
 
+@app.get("/api/search/global")
+def search_global(q: str, limit: int = 20):
+    if not q or not q.strip():
+        return []
+    try:
+        url = f"https://itunes.apple.com/search?term={urllib.parse.quote(q.strip())}&entity=song&limit={limit}"
+        req = urllib.request.Request(url, headers={"User-Agent": "Echoes/1.0"})
+        with urllib.request.urlopen(req, timeout=4) as resp:
+            data = json.loads(resp.read().decode())
+            out = []
+            for item in data.get("results", []):
+                art = item.get("artworkUrl100", "")
+                if art:
+                    art = art.replace("100x100bb.jpg", "600x600bb.jpg")
+                tr = item.get("trackName", "")
+                ar = item.get("artistName", "")
+                al = item.get("collectionName", "")
+                spotify_url = f"https://open.spotify.com/search/{urllib.parse.quote(f'{tr} {ar}')}"
+                yt_url = f"https://music.youtube.com/search?q={urllib.parse.quote(f'{tr} {ar}')}"
+
+                out.append({
+                    "id": f"global-{item.get('trackId')}",
+                    "track": tr,
+                    "artist": ar,
+                    "album": al,
+                    "art": art or None,
+                    "audio": item.get("previewUrl"),
+                    "dur": round(item.get("trackTimeMillis", 0) / 1000) if item.get("trackTimeMillis") else 210,
+                    "ref": item.get("trackViewUrl") or spotify_url,
+                    "spotify_ref": spotify_url,
+                    "ytmusic_ref": yt_url,
+                    "year": (item.get("releaseDate") or "")[:4],
+                    "genre": item.get("primaryGenreName"),
+                    "source": "catalog",
+                })
+            return out
+    except Exception as e:
+        print("Global search error:", e)
+        return []
+
+class ListenIn(BaseModel):
+    track: str
+    artist: str
+    album: Optional[str] = None
+    source: str = "spotify"
+    ref: Optional[str] = None
+    dur: Optional[int] = None
+
+@app.post("/api/listens", status_code=201)
+def log_listen(l: ListenIn):
+    now = db.now_iso()
+    with db.conn() as c:
+        cur = c.execute("""
+            INSERT INTO listens(source, track, artist, album, ref, played_at, approx, dur)
+            VALUES (?, ?, ?, ?, ?, ?, 0, ?)
+        """, (l.source, l.track, l.artist, l.album, l.ref, now, l.dur or 210))
+        return {
+            "id": cur.lastrowid,
+            "source": l.source,
+            "track": l.track,
+            "artist": l.artist,
+            "album": l.album,
+            "ref": l.ref,
+            "played_at": now,
+            "dur": l.dur or 210
+        }
+
 # ---------- notes ----------
 class NoteIn(BaseModel):
     day: str
