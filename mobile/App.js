@@ -11,6 +11,7 @@ import {
 } from "react-native";
 import { WebView } from "react-native-webview";
 import { StatusBar as ExpoStatusBar } from "expo-status-bar";
+import { registerRootComponent } from "expo";
 
 // Replace with your local machine's Wi-Fi IP address if it changes
 const DEFAULT_URL = "http://192.168.1.9:5173";
@@ -158,3 +159,5 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
 });
+
+registerRootComponent(App);
