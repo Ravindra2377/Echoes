@@ -5,3 +5,4 @@ ytmusicapi
 spotipy
 playwright
 httpx
+qrcode

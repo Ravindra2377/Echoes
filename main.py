@@ -32,8 +32,8 @@ async def lifespan(app):
         sched.shutdown(wait=False)
 
 app = FastAPI(title="Music Diary", lifespan=lifespan)
-app.add_middleware(CORSMiddleware, allow_origins=["http://localhost:3000", "http://localhost:5173"],
-                   allow_methods=["*"], allow_headers=["*"])
+app.add_middleware(CORSMiddleware, allow_origins=["*"],
+                   allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 
 def rows(sql, args=()):
     with db.conn() as c:

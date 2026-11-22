@@ -1,0 +1,22 @@
+{
+  "expo": {
+    "name": "Echoes",
+    "slug": "echoes",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": false,
+    "splash": {
+      "resizeMode": "contain",
+      "backgroundColor": "#16845B"
+    },
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#16845B"
+      }
+    }
+  }
+}

@@ -1,4 +1,17 @@
-const BASE_URL = "http://127.0.0.1:8000";
+const getBaseUrl = () => {
+  if (typeof window !== "undefined" && window.location) {
+    const { hostname, port } = window.location;
+    if (port === "8000") {
+      return "";
+    }
+    if (hostname && hostname !== "localhost" && hostname !== "127.0.0.1") {
+      return `http://${hostname}:8000`;
+    }
+  }
+  return "http://127.0.0.1:8000";
+};
+
+const BASE_URL = getBaseUrl();
 
 export async function fetchApi(endpoint, options = {}) {
   const url = `${BASE_URL}${endpoint}`;

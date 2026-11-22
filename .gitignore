@@ -11,4 +11,5 @@ amazon_session.json
 amazon_debug.png
 amazon_debug.html
 node_modules/
+.expo/
 .DS_Store
