@@ -35,6 +35,7 @@ export const api = {
   getOnThisDay: (date) => fetchApi(`/api/on-this-day${date ? `?date=${date}` : ""}`),
   search: (q, limit = 50) => fetchApi(`/api/search?q=${encodeURIComponent(q)}&limit=${limit}`),
   searchGlobal: (q, limit = 20) => fetchApi(`/api/search/global?q=${encodeURIComponent(q)}&limit=${limit}`),
+  getStream: (track, artist = "") => fetchApi(`/api/stream?track=${encodeURIComponent(track)}&artist=${encodeURIComponent(artist)}`),
   logListen: (data) => fetchApi("/api/listens", { method: "POST", body: JSON.stringify(data) }),
   getLastPlayed: () => fetchApi("/api/last-played"),
 

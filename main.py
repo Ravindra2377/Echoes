@@ -10,6 +10,13 @@ from apscheduler.schedulers.background import BackgroundScheduler
 import urllib.request, urllib.parse, json
 import db, sync
 
+try:
+    from ytmusicapi import YTMusic
+    yt = YTMusic()
+except Exception as _e:
+    print("YTMusic initialization note:", _e)
+    yt = None
+
 LOCAL = "date(played_at,'localtime')"
 
 @asynccontextmanager
@@ -74,10 +81,90 @@ def search(q: str, limit: int = 50):
     return rows("SELECT * FROM listens WHERE track LIKE ? OR artist LIKE ? OR album LIKE ? "
                 "ORDER BY played_at DESC LIMIT ?", (like, like, like, limit))
 
+_stream_cache = {}
+
+@app.get("/api/stream")
+def get_stream(track: str, artist: str = ""):
+    key = f"{track}::{artist}".lower().strip()
+    if key in _stream_cache:
+        return _stream_cache[key]
+    if yt:
+        try:
+            q = f"{track} {artist}".strip()
+            results = yt.search(q, filter="songs")
+            if not results:
+                results = yt.search(q, filter="videos")
+            if results:
+                r = results[0]
+                art = None
+                if r.get("thumbnails"):
+                    art = r["thumbnails"][-1].get("url")
+                    if art and "=w" in art:
+                        art = art.split("=")[0] + "=w600-h600-l90-rj"
+                info = {
+                    "videoId": r.get("videoId"),
+                    "track": r.get("title"),
+                    "artist": ", ".join([a.get("name", "") for a in r.get("artists", [])]) if r.get("artists") else artist,
+                    "duration": r.get("duration_seconds") or 210,
+                    "duration_str": r.get("duration") or "3:30",
+                    "art": art,
+                }
+                _stream_cache[key] = info
+                return info
+        except Exception as err:
+            print("Stream lookup error:", err)
+
+    prev = get_track_preview(track, artist)
+    info = {
+        "videoId": None,
+        "track": track,
+        "artist": artist,
+        "duration": 30,
+        "duration_str": "0:30",
+        "audio": prev.get("audio"),
+        "art": prev.get("art"),
+    }
+    _stream_cache[key] = info
+    return info
+
 @app.get("/api/search/global")
 def search_global(q: str, limit: int = 20):
     if not q or not q.strip():
         return []
+
+    # 1. First priority: YouTube Music full songs catalog
+    if yt:
+        try:
+            results = yt.search(q.strip(), filter="songs")
+            if results:
+                out = []
+                for r in results[:limit]:
+                    art = None
+                    if r.get("thumbnails"):
+                        art = r["thumbnails"][-1].get("url")
+                        if art and "=w" in art:
+                            art = art.split("=")[0] + "=w600-h600-l90-rj"
+                    artists = ", ".join([a.get("name", "") for a in r.get("artists", [])]) if r.get("artists") else ""
+                    album_obj = r.get("album")
+                    album_name = album_obj.get("name") if isinstance(album_obj, dict) else (album_obj or "")
+
+                    out.append({
+                        "id": f"yt-{r.get('videoId')}",
+                        "videoId": r.get("videoId"),
+                        "track": r.get("title"),
+                        "artist": artists,
+                        "album": album_name,
+                        "art": art,
+                        "dur": r.get("duration_seconds") or 210,
+                        "duration_str": r.get("duration") or "3:30",
+                        "year": r.get("year"),
+                        "source": "catalog",
+                    })
+                return out
+        except Exception as e:
+            print("YT search fallback to iTunes:", e)
+
+    # 2. Fallback to iTunes catalog
     try:
         url = f"https://itunes.apple.com/search?term={urllib.parse.quote(q.strip())}&entity=song&limit={limit}"
         req = urllib.request.Request(url, headers={"User-Agent": "Echoes/1.0"})
@@ -88,25 +175,17 @@ def search_global(q: str, limit: int = 20):
                 art = item.get("artworkUrl100", "")
                 if art:
                     art = art.replace("100x100bb.jpg", "600x600bb.jpg")
-                tr = item.get("trackName", "")
-                ar = item.get("artistName", "")
-                al = item.get("collectionName", "")
-                spotify_url = f"https://open.spotify.com/search/{urllib.parse.quote(f'{tr} {ar}')}"
-                yt_url = f"https://music.youtube.com/search?q={urllib.parse.quote(f'{tr} {ar}')}"
-
                 out.append({
-                    "id": f"global-{item.get('trackId')}",
-                    "track": tr,
-                    "artist": ar,
-                    "album": al,
-                    "art": art or None,
+                    "id": f"itunes-{item.get('trackId')}",
+                    "videoId": None,
+                    "track": item.get("trackName"),
+                    "artist": item.get("artistName"),
+                    "album": item.get("collectionName"),
+                    "art": art,
                     "audio": item.get("previewUrl"),
                     "dur": round(item.get("trackTimeMillis", 0) / 1000) if item.get("trackTimeMillis") else 210,
-                    "ref": item.get("trackViewUrl") or spotify_url,
-                    "spotify_ref": spotify_url,
-                    "ytmusic_ref": yt_url,
+                    "duration_str": "3:30",
                     "year": (item.get("releaseDate") or "")[:4],
-                    "genre": item.get("primaryGenreName"),
                     "source": "catalog",
                 })
             return out

@@ -18,6 +18,8 @@ export default function LastPlayedDisc() {
     currentIndex,
     isPlaying,
     isRepeating,
+    currentTime,
+    duration,
     progressPercent,
     hasNext,
     hasPrev,
@@ -29,6 +31,13 @@ export default function LastPlayedDisc() {
   } = usePlayer();
 
   const progressTrackRef = useRef(null);
+
+  const formatTime = (secs) => {
+    if (!secs || isNaN(secs)) return "0:00";
+    const m = Math.floor(secs / 60);
+    const s = Math.floor(secs % 60);
+    return `${m}:${String(s).padStart(2, "0")}`;
+  };
 
   const handleSeekClick = (e) => {
     if (!progressTrackRef.current) return;
@@ -209,6 +218,12 @@ export default function LastPlayedDisc() {
           className="lpd-progress-fill"
           style={{ width: `${progressPercent}%` }}
         />
+      </div>
+
+      {/* Elapsed / Total Duration Indicator */}
+      <div className="flex items-center justify-between text-[10px] sm:text-[11px] font-mono text-[var(--ink-faint)] w-full max-w-[min(320px,85vw)] px-1 -mt-1">
+        <span>{formatTime(currentTime)}</span>
+        <span>{formatTime(duration)}</span>
       </div>
 
       {/* Transport Controls Row */}

@@ -3,7 +3,7 @@ import { api, fetchApi } from "../config/api";
 
 const PlayerContext = createContext(null);
 
-// Ambient Vinyl Synthesizer Fallback (for tracks without CDN preview)
+// Ambient Vinyl Synthesizer Fallback (for offline or fallback playback)
 let synthCtx = null;
 let synthGain = null;
 let synthOscs = [];
@@ -62,30 +62,36 @@ export function PlayerProvider({ children }) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [isRepeating, setIsRepeating] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
-  const [duration, setDuration] = useState(30);
+  const [duration, setDuration] = useState(210);
+
+  // Playback mode: "youtube" | "html5" | "synth"
+  const [playMode, setPlayMode] = useState("youtube");
 
   const audioRef = useRef(null);
-  const isPlayingRef = useRef(false);
-  const isRepeatingRef = useRef(false);
-  const currentTrackRef = useRef(null);
+  const ytPlayerRef = useRef(null);
+  const ytReadyRef = useRef(false);
+  const timerRef = useRef(null);
 
-  isPlayingRef.current = isPlaying;
+  const isRepeatingRef = useRef(false);
   isRepeatingRef.current = isRepeating;
+
+  const playlistRef = useRef([]);
+  playlistRef.current = playlist;
+
+  const currentIndexRef = useRef(0);
+  currentIndexRef.current = currentIndex;
+
+  const currentTrackRef = useRef(null);
   currentTrackRef.current = currentTrack;
 
-  // Initialize HTML5 Audio element
+  // 1. Initialize HTML5 Audio and YouTube IFrame Player
   useEffect(() => {
     const audio = new Audio();
     audio.preload = "auto";
 
     audio.ontimeupdate = () => {
+      if (ytPlayerRef.current && ytReadyRef.current && playMode === "youtube") return;
       setCurrentTime(audio.currentTime);
-      if (audio.duration && !isNaN(audio.duration)) {
-        setDuration(audio.duration);
-      }
-    };
-
-    audio.onloadedmetadata = () => {
       if (audio.duration && !isNaN(audio.duration)) {
         setDuration(audio.duration);
       }
@@ -101,20 +107,104 @@ export function PlayerProvider({ children }) {
     };
 
     audio.onerror = () => {
-      console.warn("HTML5 audio playback error; engaging vinyl synthesizer fallback");
+      console.warn("HTML5 audio playback error; using synth fallback");
       startSynthEngine();
     };
 
     audioRef.current = audio;
 
-    // Load initial track from /api/last-played on mount
+    // Initialize YouTube Player
+    initYouTubePlayer();
+
+    // Load initial track
     loadInitialTrack();
+
+    // Real-time position polling timer for full-song YouTube playback
+    timerRef.current = setInterval(() => {
+      if (ytPlayerRef.current && ytReadyRef.current && isPlaying) {
+        try {
+          const t = ytPlayerRef.current.getCurrentTime();
+          const d = ytPlayerRef.current.getDuration();
+          if (typeof t === "number" && !isNaN(t)) {
+            setCurrentTime(t);
+          }
+          if (typeof d === "number" && !isNaN(d) && d > 0) {
+            setDuration(d);
+          }
+        } catch (_) {}
+      }
+    }, 250);
 
     return () => {
       audio.pause();
       stopSynthEngine();
+      if (timerRef.current) clearInterval(timerRef.current);
     };
   }, []);
+
+  const initYouTubePlayer = () => {
+    const createPlayer = () => {
+      try {
+        if (!window.YT || !window.YT.Player) return;
+        if (ytPlayerRef.current) return;
+
+        ytPlayerRef.current = new window.YT.Player("echoes-yt-player", {
+          height: "200",
+          width: "200",
+          playerVars: {
+            autoplay: 1,
+            controls: 0,
+            disablekb: 1,
+            fs: 0,
+            modestbranding: 1,
+            rel: 0,
+            playsinline: 1,
+          },
+          events: {
+            onReady: () => {
+              ytReadyRef.current = true;
+            },
+            onStateChange: (event) => {
+              // 1 = PLAYING, 2 = PAUSED, 0 = ENDED
+              if (event.data === 1) {
+                setIsPlaying(true);
+                stopSynthEngine();
+              } else if (event.data === 2) {
+                setIsPlaying(false);
+              } else if (event.data === 0) {
+                if (isRepeatingRef.current) {
+                  try {
+                    ytPlayerRef.current.seekTo(0, true);
+                    ytPlayerRef.current.playVideo();
+                  } catch (_) {}
+                } else {
+                  handleNextTrack();
+                }
+              }
+            },
+            onError: (err) => {
+              console.warn("YouTube Player error; falling back to preview/synth:", err);
+              // Fallback to HTML5 audio or synth
+              if (currentTrackRef.current?.audio && audioRef.current) {
+                audioRef.current.src = currentTrackRef.current.audio;
+                audioRef.current.play().catch(() => startSynthEngine());
+              } else {
+                startSynthEngine();
+              }
+            },
+          },
+        });
+      } catch (err) {
+        console.warn("Could not create YouTube Player:", err);
+      }
+    };
+
+    if (window.YT && window.YT.Player) {
+      createPlayer();
+    } else {
+      window.onYouTubeIframeAPIReady = createPlayer;
+    }
+  };
 
   const loadInitialTrack = async () => {
     try {
@@ -123,22 +213,23 @@ export function PlayerProvider({ children }) {
         setCurrentTrack(last);
         setPlaylist([last]);
         setCurrentIndex(0);
-        if (last.audio && audioRef.current) {
-          audioRef.current.src = last.audio;
-        }
+        if (last.dur) setDuration(last.dur);
       }
     } catch (err) {
       console.error("Failed to load initial last-played track:", err);
     }
   };
 
-  // Play a track in the app and immediately log the listen into the user's diary
+  // Play a full song in the app and immediately record the listen in the daily diary
   const playTrack = async (track, queue = null) => {
     if (!track) return;
 
     stopSynthEngine();
+    if (audioRef.current) {
+      audioRef.current.pause();
+    }
 
-    // 1. Determine playlist & index
+    // 1. Manage queue
     let newQueue = queue || playlist;
     if (!newQueue || newQueue.length === 0) {
       newQueue = [track];
@@ -160,87 +251,122 @@ export function PlayerProvider({ children }) {
     setCurrentTrack(fullTrack);
     setCurrentTime(0);
 
-    // 3. Automatically record this listen in the user's daily listening diary
+    // 3. Resolve Full Song Stream (YouTube videoId & true duration)
+    let videoId = fullTrack.videoId;
+    let fullDuration = fullTrack.dur || 210;
+
+    if (!videoId) {
+      try {
+        const streamData = await api.getStream(fullTrack.track, fullTrack.artist || "");
+        if (streamData?.videoId) {
+          videoId = streamData.videoId;
+          fullTrack.videoId = streamData.videoId;
+        }
+        if (streamData?.duration) {
+          fullDuration = streamData.duration;
+          fullTrack.dur = streamData.duration;
+        }
+        if (streamData?.art && !fullTrack.art) {
+          fullTrack.art = streamData.art;
+        }
+        setCurrentTrack({ ...fullTrack });
+      } catch (err) {
+        console.warn("Stream lookup notice:", err);
+      }
+    }
+
+    setDuration(fullDuration);
+
+    // 4. Automatically record this listen in the user's daily listening diary
     try {
       api.logListen({
         track: fullTrack.track,
         artist: fullTrack.artist,
         album: fullTrack.album || "",
-        source: fullTrack.source || "spotify",
+        source: fullTrack.source || "catalog",
         ref: fullTrack.ref || "",
-        dur: fullTrack.dur || 210,
+        dur: fullDuration,
       }).catch((err) => console.warn("Log listen notice:", err));
     } catch (_) {}
 
-    // 4. Resolve audio & artwork if missing
-    let audioUrl = fullTrack.audio;
-    if (!audioUrl) {
+    // 5. Play FULL song via YouTube Player
+    if (videoId && ytPlayerRef.current && ytReadyRef.current) {
       try {
-        const preview = await fetchApi(
-          `/api/preview?track=${encodeURIComponent(fullTrack.track)}&artist=${encodeURIComponent(
-            fullTrack.artist || ""
-          )}`
-        );
-        if (preview?.audio) {
-          audioUrl = preview.audio;
-          fullTrack.audio = preview.audio;
-        }
-        if (preview?.art && !fullTrack.art) {
-          fullTrack.art = preview.art;
-        }
-        setCurrentTrack({ ...fullTrack });
+        setPlayMode("youtube");
+        ytPlayerRef.current.loadVideoById(videoId);
+        ytPlayerRef.current.playVideo();
+        setIsPlaying(true);
+        return;
       } catch (err) {
-        console.warn("Preview fetch error:", err);
+        console.warn("YouTube play invocation issue:", err);
       }
     }
 
-    // 5. Play audio in the app
-    if (audioUrl && audioRef.current) {
+    // 6. Fallback: HTML5 audio or warm synth engine
+    if (fullTrack.audio && audioRef.current) {
+      setPlayMode("html5");
       try {
-        audioRef.current.src = audioUrl;
+        audioRef.current.src = fullTrack.audio;
         audioRef.current.currentTime = 0;
         await audioRef.current.play();
         setIsPlaying(true);
+        return;
       } catch (err) {
-        console.warn("Playback autoplay issue; switching to synth fallback:", err);
-        startSynthEngine();
-        setIsPlaying(true);
+        console.warn("HTML5 audio autoplay issue:", err);
       }
-    } else {
-      startSynthEngine();
-      setIsPlaying(true);
     }
+
+    // 7. Ambient vinyl synth fallback
+    setPlayMode("synth");
+    startSynthEngine();
+    setIsPlaying(true);
   };
 
   const togglePlay = async () => {
     if (isPlaying) {
+      // Pause
+      if (ytPlayerRef.current && ytReadyRef.current && playMode === "youtube") {
+        try {
+          ytPlayerRef.current.pauseVideo();
+        } catch (_) {}
+      }
       if (audioRef.current) {
         audioRef.current.pause();
       }
       stopSynthEngine();
       setIsPlaying(false);
     } else {
+      // Resume
       if (currentTrack) {
+        if (currentTrack.videoId && ytPlayerRef.current && ytReadyRef.current) {
+          try {
+            ytPlayerRef.current.playVideo();
+            setIsPlaying(true);
+            return;
+          } catch (_) {}
+        }
         if (audioRef.current && audioRef.current.src && audioRef.current.src !== window.location.href) {
           try {
             await audioRef.current.play();
             setIsPlaying(true);
-          } catch (err) {
-            startSynthEngine();
-            setIsPlaying(true);
-          }
-        } else {
-          playTrack(currentTrack);
+            return;
+          } catch (_) {}
         }
+        playTrack(currentTrack);
       }
     }
   };
 
   const seek = (seconds) => {
-    if (audioRef.current && duration > 0) {
-      const clampSec = Math.max(0, Math.min(seconds, duration));
+    const clampSec = Math.max(0, Math.min(seconds, duration));
+    setCurrentTime(clampSec);
+
+    if (ytPlayerRef.current && ytReadyRef.current && playMode === "youtube") {
+      try {
+        ytPlayerRef.current.seekTo(clampSec, true);
+      } catch (_) {}
+    } else if (audioRef.current) {
       audioRef.current.currentTime = clampSec;
-      setCurrentTime(clampSec);
     }
   };
 
@@ -252,15 +378,21 @@ export function PlayerProvider({ children }) {
   };
 
   const handleNextTrack = () => {
-    if (playlist.length > 0 && currentIndex < playlist.length - 1) {
-      const nextIdx = currentIndex + 1;
+    const q = playlistRef.current;
+    const curIdx = currentIndexRef.current;
+    if (q.length > 0 && curIdx < q.length - 1) {
+      const nextIdx = curIdx + 1;
       setCurrentIndex(nextIdx);
-      playTrack(playlist[nextIdx], playlist);
-    } else if (playlist.length > 0) {
-      // Loop back to start or pause
+      playTrack(q[nextIdx], q);
+    } else if (q.length > 0) {
       if (isRepeatingRef.current) {
-        playTrack(playlist[0], playlist);
+        playTrack(q[0], q);
       } else {
+        if (ytPlayerRef.current && ytReadyRef.current) {
+          try {
+            ytPlayerRef.current.pauseVideo();
+          } catch (_) {}
+        }
         if (audioRef.current) audioRef.current.pause();
         stopSynthEngine();
         setIsPlaying(false);
@@ -270,14 +402,16 @@ export function PlayerProvider({ children }) {
   };
 
   const handlePrevTrack = () => {
-    if (currentTime > 3) {
+    if (currentTime > 4) {
       seek(0);
       return;
     }
-    if (playlist.length > 0 && currentIndex > 0) {
-      const prevIdx = currentIndex - 1;
+    const q = playlistRef.current;
+    const curIdx = currentIndexRef.current;
+    if (q.length > 0 && curIdx > 0) {
+      const prevIdx = curIdx - 1;
       setCurrentIndex(prevIdx);
-      playTrack(playlist[prevIdx], playlist);
+      playTrack(q[prevIdx], q);
     } else {
       seek(0);
     }
@@ -288,7 +422,7 @@ export function PlayerProvider({ children }) {
   };
 
   const hasNext = playlist.length > 0 && currentIndex < playlist.length - 1;
-  const hasPrev = playlist.length > 0 && (currentIndex > 0 || currentTime > 3);
+  const hasPrev = playlist.length > 0 && (currentIndex > 0 || currentTime > 4);
   const progressPercent = duration > 0 ? (currentTime / duration) * 100 : 0;
 
   return (
@@ -314,6 +448,23 @@ export function PlayerProvider({ children }) {
       }}
     >
       {children}
+
+      {/* Hidden In-App YouTube Full-Song Audio Engine */}
+      <div
+        id="echoes-yt-engine-container"
+        style={{
+          position: "fixed",
+          top: "-2000px",
+          left: "-2000px",
+          width: "200px",
+          height: "200px",
+          opacity: 0.001,
+          pointerEvents: "none",
+          zIndex: -9999,
+        }}
+      >
+        <div id="echoes-yt-player" />
+      </div>
     </PlayerContext.Provider>
   );
 }
