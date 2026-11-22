@@ -1,10 +1,10 @@
-import React, { useState, useEffect, useRef } from "react";
-import { api, fetchApi } from "../config/api";
+import React, { useState, useEffect } from "react";
+import { api } from "../config/api";
+import { usePlayer } from "../context/PlayerContext";
 import {
   Calendar,
   Clock,
   Music,
-  ExternalLink,
   Disc,
   Edit2,
   Check,
@@ -17,17 +17,14 @@ import { SurfaceCard, PillBadge, AppButton } from "../components/SharedUI";
 import PulseLine from "../components/PulseLine";
 
 export default function TimelineScreen({ selectedDay: initialDay }) {
+  const { currentTrack, isPlaying, playTrack, togglePlay } = usePlayer();
+
   const [days, setDays] = useState([]);
   const [selectedDay, setSelectedDay] = useState(initialDay || null);
   const [dayDetails, setDayDetails] = useState(null);
   const [loading, setLoading] = useState(true);
   const [loadingDetails, setLoadingDetails] = useState(false);
   const [syncing, setSyncing] = useState(false);
-
-  // Audio Preview Playback
-  const [playingTrackId, setPlayingTrackId] = useState(null);
-  const [audioLoadingId, setAudioLoadingId] = useState(null);
-  const audioRef = useRef(null);
 
   // Day Title Editing State
   const [isEditingTitle, setIsEditingTitle] = useState(false);
@@ -37,11 +34,6 @@ export default function TimelineScreen({ selectedDay: initialDay }) {
 
   useEffect(() => {
     loadTimeline();
-    return () => {
-      if (audioRef.current) {
-        audioRef.current.pause();
-      }
-    };
   }, []);
 
   useEffect(() => {
@@ -68,10 +60,6 @@ export default function TimelineScreen({ selectedDay: initialDay }) {
   const loadDayDetails = async (day) => {
     setLoadingDetails(true);
     setIsEditingTitle(false);
-    if (audioRef.current) {
-      audioRef.current.pause();
-      setPlayingTrackId(null);
-    }
     try {
       const [data, pulseData] = await Promise.all([
         api.getDay(day),
@@ -103,43 +91,20 @@ export default function TimelineScreen({ selectedDay: initialDay }) {
     }
   };
 
-  const handlePlayTrack = async (track) => {
-    if (playingTrackId === track.id) {
-      if (audioRef.current) {
-        audioRef.current.pause();
-      }
-      setPlayingTrackId(null);
-      return;
-    }
+  const isTrackCurrentlyPlaying = (track) => {
+    if (!isPlaying || !currentTrack) return false;
+    if (currentTrack.id === track.id) return true;
+    return (
+      currentTrack.track?.toLowerCase() === track.track?.toLowerCase() &&
+      currentTrack.artist?.toLowerCase() === track.artist?.toLowerCase()
+    );
+  };
 
-    setAudioLoadingId(track.id);
-    try {
-      const previewData = await fetchApi(
-        `/api/preview?track=${encodeURIComponent(track.track)}&artist=${encodeURIComponent(
-          track.artist || ""
-        )}`
-      );
-
-      if (previewData?.audio) {
-        if (audioRef.current) {
-          audioRef.current.pause();
-        }
-        const audio = new Audio(previewData.audio);
-        audio.onended = () => setPlayingTrackId(null);
-        audio.onerror = () => setPlayingTrackId(null);
-        await audio.play();
-        audioRef.current = audio;
-        setPlayingTrackId(track.id);
-      } else if (track.ref) {
-        window.open(track.ref, "_blank");
-      }
-    } catch (err) {
-      console.error("Audio preview error:", err);
-      if (track.ref) {
-        window.open(track.ref, "_blank");
-      }
-    } finally {
-      setAudioLoadingId(null);
+  const handlePlayTrack = (track) => {
+    if (isTrackCurrentlyPlaying(track)) {
+      togglePlay();
+    } else {
+      playTrack(track, dayDetails?.listens || []);
     }
   };
 
@@ -523,17 +488,17 @@ export default function TimelineScreen({ selectedDay: initialDay }) {
                   ) : (
                     <div className="divide-y divide-[var(--border)] bg-[var(--card)] border border-[var(--border)] rounded-2xl overflow-hidden shadow-sm">
                       {dayDetails.listens.map((track, idx) => {
-                        const isCurrentlyPlaying = playingTrackId === track.id;
-                        const isLoadingAudio = audioLoadingId === track.id;
+                        const isCurrentlyPlaying = isTrackCurrentlyPlaying(track);
                         const playedTime = formatPlayedAt(track.played_at);
 
                         return (
                           <div
                             key={track.id || idx}
+                            onClick={() => handlePlayTrack(track)}
                             style={{ animationDelay: `${Math.min(idx * 30, 360)}ms` }}
-                            className={`stagger-item p-2.5 sm:p-3.5 flex items-center justify-between gap-2 sm:gap-3 transition duration-200 ${
+                            className={`stagger-item p-2.5 sm:p-3.5 flex items-center justify-between gap-2 sm:gap-3 transition duration-200 cursor-pointer ${
                               isCurrentlyPlaying
-                                ? "bg-[var(--aubergine-soft)]/60 shadow-sm"
+                                ? "bg-[var(--aubergine-soft)]/60 shadow-sm border-l-4 border-l-[var(--primary)]"
                                 : "hover:bg-[var(--paper)]"
                             }`}
                           >
@@ -541,7 +506,10 @@ export default function TimelineScreen({ selectedDay: initialDay }) {
                             <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
                               <button
                                 type="button"
-                                onClick={() => handlePlayTrack(track)}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handlePlayTrack(track);
+                                }}
                                 className={`group/btn w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center shrink-0 transition-all duration-200 ${
                                   isCurrentlyPlaying
                                     ? "bg-[var(--primary)] text-white shadow-md ring-2 ring-[var(--primary)]/30"
@@ -549,13 +517,11 @@ export default function TimelineScreen({ selectedDay: initialDay }) {
                                 }`}
                                 title={
                                   isCurrentlyPlaying
-                                    ? "Pause preview"
-                                    : "Play 30s preview"
+                                    ? "Pause in Echoes"
+                                    : "Play in Echoes"
                                 }
                               >
-                                {isLoadingAudio ? (
-                                  <Disc className="w-3.5 h-3.5 sm:w-4 sm:h-4 animate-spin text-[var(--primary)]" />
-                                ) : isCurrentlyPlaying ? (
+                                {isCurrentlyPlaying ? (
                                   <>
                                     <div className="eq-container text-white group-hover/btn:hidden">
                                       <span className="eq-bar eq-bar-1" />
@@ -579,8 +545,8 @@ export default function TimelineScreen({ selectedDay: initialDay }) {
                                     {track.track}
                                   </h4>
                                   {isCurrentlyPlaying && (
-                                    <span className="text-[9px] sm:text-[10px] font-semibold px-1.5 py-0.2 rounded-full bg-[var(--primary)] text-white shrink-0">
-                                      Playing
+                                    <span className="text-[9px] sm:text-[10px] font-semibold px-1.5 py-0.2 rounded-full bg-[var(--primary)] text-white shrink-0 animate-pulse">
+                                      Playing in Echoes
                                     </span>
                                   )}
                                 </div>
@@ -599,7 +565,7 @@ export default function TimelineScreen({ selectedDay: initialDay }) {
                               </div>
                             </div>
 
-                            {/* Right: Timestamp, platform badge, duration, link */}
+                            {/* Right: Timestamp, platform badge, duration */}
                             <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
                               {playedTime && (
                                 <div className="flex items-center gap-1 text-[10px] sm:text-[11px] font-mono text-[var(--ink-soft)] px-1.5 sm:px-2 py-0.5 rounded-md bg-[var(--card-alt)]">
@@ -615,18 +581,6 @@ export default function TimelineScreen({ selectedDay: initialDay }) {
                               <span className="text-[10px] sm:text-xs font-mono text-[var(--ink-faint)] w-8 sm:w-10 text-right">
                                 {formatDuration(track.dur)}
                               </span>
-
-                              {track.ref && (
-                                <a
-                                  href={track.ref}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="w-6 h-6 sm:w-7 sm:h-7 rounded-full flex items-center justify-center bg-[var(--card-alt)] text-[var(--ink-soft)] hover:text-[var(--primary)] hover:bg-[var(--aubergine-soft)] transition"
-                                  title={`Open on ${track.source}`}
-                                >
-                                  <ExternalLink className="w-3 h-3" />
-                                </a>
-                              )}
                             </div>
                           </div>
                         );

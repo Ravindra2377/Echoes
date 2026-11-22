@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
+import { usePlayer } from "../context/PlayerContext";
 import { api } from "../config/api";
 import {
   Clock,
   Headphones,
   Disc,
+  Play,
 } from "lucide-react";
 import { SurfaceCard, PillBadge, AppButton } from "../components/SharedUI";
 import LastPlayedDisc from "../components/LastPlayedDisc";
@@ -18,6 +20,7 @@ const getGreeting = () => {
 
 export default function HomeScreen({ onNavigateSearch, onNavigateTimeline, onNavigateAccounts }) {
   const { user } = useAuth();
+  const { playTrack } = usePlayer();
   const [onThisDay, setOnThisDay] = useState(null);
   const [recentTimeline, setRecentTimeline] = useState([]);
   const [stats, setStats] = useState(null);
@@ -107,12 +110,19 @@ export default function HomeScreen({ onNavigateSearch, onNavigateTimeline, onNav
             </p>
           </div>
 
-          <div className="pt-4 flex items-center gap-3">
+          <div className="pt-4 flex items-center gap-2.5 flex-wrap">
+            <AppButton
+              label="Play on Turntable"
+              icon={Play}
+              onPress={() => playTrack(onThisDay)}
+              className="bg-white text-[#0D4F3C] hover:bg-neutral-100 font-bold px-4 py-2 text-xs shadow-md"
+            />
             <AppButton
               label="Find in Library"
               icon={Disc}
+              variant="secondary"
               onPress={() => onNavigateSearch(onThisDay.track)}
-              className="bg-white text-[#0D4F3C] hover:bg-neutral-100 font-bold px-4 py-2 text-xs shadow-md"
+              className="bg-white/15 text-white hover:bg-white/25 border-none font-medium px-3.5 py-2 text-xs"
             />
           </div>
         </div>

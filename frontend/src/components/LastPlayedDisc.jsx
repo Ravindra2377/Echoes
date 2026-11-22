@@ -1,5 +1,6 @@
-import React, { useEffect, useState, useRef } from "react";
+import React, { useRef } from "react";
 import { Play, Pause, SkipBack, SkipForward, Repeat } from "lucide-react";
+import { usePlayer } from "../context/PlayerContext";
 import "./LastPlayedDisc.css";
 
 const SOURCES = {
@@ -7,308 +8,50 @@ const SOURCES = {
   ytmusic: { name: "YT Music", color: "#e0453a" },
   yt: { name: "YT Music", color: "#e0453a" },
   amazon: { name: "Amazon Music", color: "#2e86c1" },
+  catalog: { name: "Catalog", color: "#16845B" },
 };
 
-function timeAgo(iso) {
-  if (!iso) return "";
-  const mins = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 60000));
-  if (mins < 2) return "just now";
-  if (mins < 60) return `${mins} min ago`;
-  const h = Math.round(mins / 60);
-  if (h < 24) return `${h} hr ago`;
-  const d = Math.round(h / 24);
-  return d === 1 ? "yesterday" : `${d} days ago`;
-}
+export default function LastPlayedDisc() {
+  const {
+    currentTrack,
+    playlist,
+    currentIndex,
+    isPlaying,
+    isRepeating,
+    progressPercent,
+    hasNext,
+    hasPrev,
+    togglePlay,
+    seekPercent,
+    nextTrack,
+    prevTrack,
+    toggleRepeat,
+  } = usePlayer();
 
-// Web Audio API ambient vinyl synth fallback
-let audioCtx = null;
-let synthGain = null;
-let synthOscs = [];
-
-function startSynthFallback() {
-  try {
-    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-    if (!AudioContextClass) return;
-    if (!audioCtx) audioCtx = new AudioContextClass();
-    if (audioCtx.state === "suspended") audioCtx.resume();
-
-    stopSynthFallback();
-
-    const master = audioCtx.createGain();
-    master.gain.setValueAtTime(0.06, audioCtx.currentTime);
-    master.connect(audioCtx.destination);
-    synthGain = master;
-
-    // Warm dreamy lo-fi chord: Eb3, G3, Bb3, D4
-    const notes = [155.56, 196.00, 233.08, 293.66];
-    synthOscs = notes.map((f) => {
-      const osc = audioCtx.createOscillator();
-      const g = audioCtx.createGain();
-      osc.type = "sine";
-      osc.frequency.setValueAtTime(f, audioCtx.currentTime);
-      g.gain.setValueAtTime(0.25, audioCtx.currentTime);
-      osc.connect(g);
-      g.connect(master);
-      osc.start();
-      return osc;
-    });
-  } catch (err) {
-    console.warn("Synth fallback error:", err);
-  }
-}
-
-function stopSynthFallback() {
-  if (synthGain && audioCtx) {
-    try {
-      synthGain.gain.setValueAtTime(0, audioCtx.currentTime);
-    } catch (_) {}
-  }
-  synthOscs.forEach((o) => {
-    try {
-      o.stop();
-    } catch (_) {}
-  });
-  synthOscs = [];
-  synthGain = null;
-}
-
-export default function LastPlayedDisc({
-  track: givenTrack,
-  playlist: givenPlaylist,
-  endpoint = (typeof window !== "undefined" && window.location.port === "5173"
-    ? "http://127.0.0.1:8000/api/last-played"
-    : "/api/last-played"),
-}) {
-  const [playlist, setPlaylist] = useState([]);
-  const [currentIndex, setCurrentIndex] = useState(0);
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [isRepeating, setIsRepeating] = useState(false);
-  const [isFinished, setIsFinished] = useState(false);
-  const [currentTime, setCurrentTime] = useState(0);
-  const [duration, setDuration] = useState(30);
-
-  const audioRef = useRef(null);
   const progressTrackRef = useRef(null);
 
-  // Initialize or fetch playlist & current song
-  useEffect(() => {
-    if (givenPlaylist && givenPlaylist.length > 0) {
-      setPlaylist(givenPlaylist);
-      setCurrentIndex(0);
-      return;
-    }
-
-    if (givenTrack) {
-      setPlaylist([givenTrack]);
-      setCurrentIndex(0);
-      return;
-    }
-
-    // Default: fetch /api/last-played and check that day's session
-    let alive = true;
-    const load = async () => {
-      try {
-        const last = await fetch(endpoint).then((r) => (r.ok ? r.json() : null));
-        if (!alive || !last) return;
-
-        // Check if there are other listens from the same day
-        if (last.played_at) {
-          const day = last.played_at.slice(0, 10);
-          const dayData = await fetch(
-            window.location.port === "5173"
-              ? `http://127.0.0.1:8000/api/days/${day}`
-              : `/api/days/${day}`
-          ).then((r) => (r.ok ? r.json() : null));
-
-          if (alive && dayData?.listens?.length > 1) {
-            // Found a playlist of songs for this day
-            const list = dayData.listens;
-            setPlaylist(list);
-            const idx = list.findIndex((item) => item.track === last.track);
-            setCurrentIndex(idx >= 0 ? idx : list.length - 1);
-            return;
-          }
-        }
-
-        // Single track fallback
-        if (alive) {
-          setPlaylist([last]);
-          setCurrentIndex(0);
-        }
-      } catch (err) {
-        console.error("Failed to load turntable data:", err);
-      }
-    };
-
-    load();
-    const id = setInterval(load, 60000);
-    return () => {
-      alive = false;
-      clearInterval(id);
-    };
-  }, [givenTrack, givenPlaylist, endpoint]);
-
-  const currentTrack = playlist[currentIndex] || null;
-  const isPlaylist = playlist.length > 1;
-  const hasNext = isPlaylist && currentIndex < playlist.length - 1;
-  const hasPrev = isPlaylist && currentIndex > 0;
-  const nextTrack = hasNext ? playlist[currentIndex + 1] : null;
-
-  const src = SOURCES[currentTrack?.source] || {
-    name: currentTrack?.source || "",
-    color: "#e0453a",
-  };
-
-  // Setup HTML5 Audio element
-  useEffect(() => {
-    const audio = new Audio();
-    audio.volume = 0.75;
-
-    const handleTimeUpdate = () => {
-      setCurrentTime(audio.currentTime);
-      if (audio.duration && !isNaN(audio.duration)) {
-        setDuration(audio.duration);
-      }
-    };
-
-    const handleEnded = () => {
-      if (isRepeating) {
-        audio.currentTime = 0;
-        audio.play().catch(() => {});
-      } else if (isPlaylist && currentIndex < playlist.length - 1) {
-        setCurrentIndex((prev) => prev + 1);
-      } else {
-        setIsPlaying(false);
-        setIsFinished(true);
-        stopSynthFallback();
-      }
-    };
-
-    audio.addEventListener("timeupdate", handleTimeUpdate);
-    audio.addEventListener("ended", handleEnded);
-    audioRef.current = audio;
-
-    return () => {
-      audio.removeEventListener("timeupdate", handleTimeUpdate);
-      audio.removeEventListener("ended", handleEnded);
-      audio.pause();
-      stopSynthFallback();
-      audioRef.current = null;
-    };
-  }, [isRepeating, isPlaylist, currentIndex, playlist.length]);
-
-  // Load preview audio when currentTrack changes
-  useEffect(() => {
-    if (!currentTrack) return;
-    setIsFinished(false);
-    setCurrentTime(0);
-
-    const loadAudio = async () => {
-      let audioUrl = currentTrack.audio;
-
-      // If audio URL not yet on the object, query /api/preview
-      if (!audioUrl) {
-        try {
-          const previewEndpoint =
-            window.location.port === "5173"
-              ? "http://127.0.0.1:8000/api/preview"
-              : "/api/preview";
-          const res = await fetch(
-            `${previewEndpoint}?track=${encodeURIComponent(
-              currentTrack.track
-            )}&artist=${encodeURIComponent(currentTrack.artist || "")}`
-          ).then((r) => (r.ok ? r.json() : null));
-
-          if (res?.audio) {
-            audioUrl = res.audio;
-            if (res.art && !currentTrack.art) {
-              currentTrack.art = res.art;
-            }
-          }
-        } catch (_) {}
-      }
-
-      if (audioRef.current) {
-        if (audioUrl) {
-          audioRef.current.src = audioUrl;
-          if (isPlaying) {
-            audioRef.current.play().catch(() => {
-              startSynthFallback();
-            });
-          }
-        } else if (isPlaying) {
-          startSynthFallback();
-        }
-      }
-    };
-
-    loadAudio();
-  }, [currentIndex, currentTrack?.track, currentTrack?.artist]);
-
-  // Handle Play/Pause
-  const handleTogglePlay = () => {
-    const nextPlay = !isPlaying;
-    setIsPlaying(nextPlay);
-    setIsFinished(false);
-
-    if (nextPlay) {
-      if (audioRef.current?.src) {
-        audioRef.current.play().catch(() => {
-          startSynthFallback();
-        });
-      } else {
-        startSynthFallback();
-      }
-    } else {
-      if (audioRef.current) {
-        audioRef.current.pause();
-      }
-      stopSynthFallback();
-    }
-  };
-
-  // Next Track
-  const handleNext = () => {
-    if (hasNext) {
-      setCurrentIndex((prev) => prev + 1);
-    }
-  };
-
-  // Previous Track
-  const handlePrev = () => {
-    if (audioRef.current && audioRef.current.currentTime > 2) {
-      audioRef.current.currentTime = 0;
-      setCurrentTime(0);
-      return;
-    }
-    if (hasPrev) {
-      setCurrentIndex((prev) => prev - 1);
-    }
-  };
-
-  // Seek bar click
-  const handleSeek = (e) => {
-    if (!progressTrackRef.current || !duration) return;
+  const handleSeekClick = (e) => {
+    if (!progressTrackRef.current) return;
     const rect = progressTrackRef.current.getBoundingClientRect();
-    const pos = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
-    const newTime = pos * duration;
-    setCurrentTime(newTime);
-    if (audioRef.current) {
-      audioRef.current.currentTime = newTime;
-    }
+    const pos = Math.max(0, Math.min(100, ((e.clientX - rect.left) / rect.width) * 100));
+    seekPercent(pos);
   };
-
-  const progressPercent = duration > 0 ? (currentTime / duration) * 100 : 0;
 
   if (!currentTrack) {
     return (
       <section className="lpd">
-        <div className="lpd-text lpd-empty">Nothing played yet. Press Sync.</div>
+        <div className="lpd-text lpd-empty text-xs text-[var(--ink-soft)]">
+          No track loaded yet. Search for a song to play!
+        </div>
       </section>
     );
   }
 
-  // Next upcoming tracks for stacked vinyl display (if in playlist mode)
+  const src = SOURCES[currentTrack.source] || { name: "Music", color: "#16845B" };
+  const isPlaylist = playlist.length > 1;
+  const nextTrackItem = hasNext ? playlist[currentIndex + 1] : null;
+
+  // Upcoming stacked records
   const stackedTracks = isPlaylist
     ? playlist.slice(currentIndex + 1, currentIndex + 4)
     : [];
@@ -319,15 +62,15 @@ export default function LastPlayedDisc({
       <div className={`lpd-visual ${isPlaying ? "lpd-is-playing" : "lpd-is-paused"}`}>
         <div
           className="lpd-stage"
-          onClick={handleTogglePlay}
-          title={isPlaying ? "Click to stop" : "Click to play"}
+          onClick={togglePlay}
+          title={isPlaying ? "Click to pause" : "Click to play"}
         >
           {/* Ambient Turntable Soundwave Halo */}
           <div className="lpd-ambient-halo" />
 
-          {/* Background Cascading Records (only when there are upcoming tracks) */}
+          {/* Background Cascading Records */}
           {stackedTracks.map((trk, i) => {
-            const trkSrc = SOURCES[trk.source] || { color: "#8b5cf6" };
+            const trkSrc = SOURCES[trk.source] || { color: "#16845B" };
             return (
               <div
                 key={trk.id || trk.track + i}
@@ -416,51 +159,50 @@ export default function LastPlayedDisc({
         </div>
       </div>
 
-      {/* Pill Badge: "Up next..." or "Ends after this song" */}
+      {/* Pill Badge: "Up next..." or "Currently Playing" */}
       <div>
-        {isPlaylist && nextTrack ? (
+        {isPlaylist && nextTrackItem ? (
           <div
             className="lpd-pill"
-            onClick={handleNext}
-            title={`Skip to next: ${nextTrack.track}`}
+            onClick={nextTrack}
+            title={`Skip to next: ${nextTrackItem.track}`}
           >
             <span
               className="lpd-pill-dot"
               style={{
-                background: SOURCES[nextTrack.source]?.color || "#a855f7",
+                background: SOURCES[nextTrackItem.source]?.color || "#16845B",
               }}
             />
             <span className="truncate">
-              Up next <strong className="font-semibold">{nextTrack.track}</strong> · {nextTrack.artist}
+              Up next <strong className="font-semibold">{nextTrackItem.track}</strong> · {nextTrackItem.artist}
             </span>
           </div>
         ) : (
           <div className="lpd-pill cursor-default">
-            <span>{isRepeating ? "Repeating this song" : "Ends after this song"}</span>
+            <span>{isRepeating ? "Repeating this song" : "Playing directly in Echoes"}</span>
           </div>
         )}
       </div>
 
-      {/* Track Information (Fraunces & Instrument Sans) */}
+      {/* Track Information */}
       <div className="lpd-info">
         <div className="lpd-kicker">
-          {isPlaying ? "Playing now" : isFinished ? "Finished" : "Last played"}
+          {isPlaying ? "Playing now" : "Ready to play"}
         </div>
         <h2 className="lpd-title">{currentTrack.track}</h2>
         <p className="lpd-artist">{currentTrack.artist}</p>
         <p className="lpd-subtitle">
-          {isPlaylist
-            ? `${currentTrack.album || "Queue"} · ${currentIndex + 1} of ${playlist.length}`
-            : "Single song"}
-          {isRepeating && " · repeating this song"}
+          {currentTrack.album ? currentTrack.album : "In-App Track"}
+          {isPlaylist ? ` · ${currentIndex + 1} of ${playlist.length}` : ""}
+          {isRepeating && " · repeating"}
         </p>
       </div>
 
-      {/* Green Audio Progress Bar */}
+      {/* Audio Progress Bar */}
       <div
         ref={progressTrackRef}
         className="lpd-progress-track"
-        onClick={handleSeek}
+        onClick={handleSeekClick}
         title="Seek position"
       >
         <div
@@ -469,13 +211,13 @@ export default function LastPlayedDisc({
         />
       </div>
 
-      {/* Transport Playback Controls Row */}
+      {/* Transport Controls Row */}
       <div className="lpd-controls">
         {/* Previous */}
         <button
           type="button"
-          onClick={handlePrev}
-          disabled={!hasPrev && currentTime < 2}
+          onClick={prevTrack}
+          disabled={!hasPrev}
           className="lpd-btn"
           title="Previous song"
         >
@@ -485,7 +227,7 @@ export default function LastPlayedDisc({
         {/* Play / Pause */}
         <button
           type="button"
-          onClick={handleTogglePlay}
+          onClick={togglePlay}
           className="lpd-btn lpd-btn-play"
           title={isPlaying ? "Pause" : "Play"}
         >
@@ -499,7 +241,7 @@ export default function LastPlayedDisc({
         {/* Next */}
         <button
           type="button"
-          onClick={handleNext}
+          onClick={nextTrack}
           disabled={!hasNext}
           className="lpd-btn"
           title="Next song"
@@ -510,7 +252,7 @@ export default function LastPlayedDisc({
         {/* Repeat Toggle */}
         <button
           type="button"
-          onClick={() => setIsRepeating(!isRepeating)}
+          onClick={toggleRepeat}
           className={`lpd-btn lpd-btn-repeat ${isRepeating ? "is-active" : ""}`}
           title={isRepeating ? "Repeat: On" : "Repeat: Off"}
         >

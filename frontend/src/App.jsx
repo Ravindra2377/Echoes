@@ -1,8 +1,10 @@
 import React, { useState } from "react";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { ThemeProvider } from "./context/ThemeContext";
+import { PlayerProvider } from "./context/PlayerContext";
 import BrandHeader from "./components/BrandHeader";
 import CustomTabBar from "./components/CustomTabBar";
+import MiniPlayer from "./components/MiniPlayer";
 import { api } from "./config/api";
 
 // Screens
@@ -36,7 +38,6 @@ function MainApp() {
     setIsSyncing(true);
     try {
       await api.triggerSync(null, false);
-      // Wait a moment for background task trigger
       setTimeout(() => {
         setIsSyncing(false);
       }, 1500);
@@ -88,7 +89,12 @@ function MainApp() {
         {activeTab === "accounts" && <AccountsScreen />}
       </main>
 
-      {/* Floating Bottom Tab Bar matching CompareX */}
+      {/* Floating MiniPlayer when browsing non-home screens */}
+      {activeTab !== "home" && (
+        <MiniPlayer onExpandHome={() => setActiveTab("home")} />
+      )}
+
+      {/* Floating Bottom Tab Bar */}
       <CustomTabBar activeTab={activeTab} onSelectTab={setActiveTab} />
     </div>
   );
@@ -98,7 +104,9 @@ export default function App() {
   return (
     <ThemeProvider>
       <AuthProvider>
-        <MainApp />
+        <PlayerProvider>
+          <MainApp />
+        </PlayerProvider>
       </AuthProvider>
     </ThemeProvider>
   );
