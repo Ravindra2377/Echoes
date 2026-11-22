@@ -101,13 +101,15 @@ def get_stream(track: str, artist: str = ""):
                     art = r["thumbnails"][-1].get("url")
                     if art and "=w" in art:
                         art = art.split("=")[0] + "=w600-h600-l90-rj"
+                prev = get_track_preview(track, artist)
                 info = {
                     "videoId": r.get("videoId"),
                     "track": r.get("title"),
                     "artist": ", ".join([a.get("name", "") for a in r.get("artists", [])]) if r.get("artists") else artist,
                     "duration": r.get("duration_seconds") or 210,
                     "duration_str": r.get("duration") or "3:30",
-                    "art": art,
+                    "art": art or prev.get("art"),
+                    "audio": prev.get("audio"),
                 }
                 _stream_cache[key] = info
                 return info
@@ -364,7 +366,7 @@ def last_played():
     if not r:
         return None
     item = dict(r[0])
-    extra = get_track_preview(item.get("track", ""), item.get("artist", ""))
+    extra = get_stream(item.get("track", ""), item.get("artist", ""))
     item.update(extra)
     return item
 
